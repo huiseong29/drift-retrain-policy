@@ -3,3 +3,7 @@ pandas
 scikit-learn
 scipy
 matplotlib
+river
+fastapi
+uvicorn[standard]
+httpx

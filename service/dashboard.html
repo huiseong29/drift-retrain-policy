@@ -1,0 +1,483 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Drift Monitor</title>
+    <style>
+      :root {
+        --bg: #fbfbfc;
+        --panel: #fff;
+        --line: #e6e7eb;
+        --ink: #1c1d21;
+        --mute: #6b6f76;
+        --blue: #1f77b4;
+        --red: #d62728;
+        --orange: #ff7f0e;
+        --teal: #17becf;
+        --green: #2ca02c;
+        --violet: #9467bd;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root:not([data-theme="light"]) {
+          --bg: #131417;
+          --panel: #1b1d21;
+          --line: #2c2f35;
+          --ink: #eceef2;
+          --mute: #9aa0a8;
+        }
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--ink);
+        font:
+          14px/1.5 -apple-system,
+          BlinkMacSystemFont,
+          "Segoe UI",
+          Roboto,
+          "Helvetica Neue",
+          "Apple SD Gothic Neo",
+          "Malgun Gothic",
+          sans-serif;
+      }
+      .wrap {
+        max-width: 1180px;
+        margin: 0 auto;
+        padding: 24px 16px 56px;
+      }
+      header {
+        display: flex;
+        align-items: baseline;
+        gap: 12px;
+        flex-wrap: wrap;
+        margin-bottom: 18px;
+      }
+      h1 {
+        font-size: 19px;
+        margin: 0;
+        letter-spacing: -0.2px;
+      }
+      .sub {
+        color: var(--mute);
+        font-size: 13px;
+      }
+      .dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: var(--green);
+        display: inline-block;
+        margin-right: 6px;
+      }
+      .dot.off {
+        background: var(--mute);
+      }
+      .tiles {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+        gap: 10px;
+        margin-bottom: 18px;
+      }
+      .tile {
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        padding: 12px 14px;
+      }
+      .tile .k {
+        color: var(--mute);
+        font-size: 11.5px;
+        text-transform: uppercase;
+        letter-spacing: 0.4px;
+      }
+      .tile .v {
+        font-size: 23px;
+        font-weight: 650;
+        margin-top: 3px;
+        font-variant-numeric: tabular-nums;
+      }
+      .panel {
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        padding: 16px;
+        margin-bottom: 16px;
+      }
+      .panel h2 {
+        font-size: 14px;
+        margin: 0 0 2px;
+      }
+      .panel .cap {
+        color: var(--mute);
+        font-size: 12.5px;
+        margin-bottom: 10px;
+      }
+      svg {
+        width: 100%;
+        display: block;
+        overflow: visible;
+      }
+      .legend {
+        display: flex;
+        gap: 14px;
+        flex-wrap: wrap;
+        font-size: 12px;
+        color: var(--mute);
+        margin-top: 8px;
+      }
+      .legend i {
+        width: 16px;
+        height: 3px;
+        border-radius: 2px;
+        display: inline-block;
+        vertical-align: middle;
+        margin-right: 5px;
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 13px;
+      }
+      th,
+      td {
+        text-align: left;
+        padding: 7px 8px;
+        border-bottom: 1px solid var(--line);
+        vertical-align: top;
+      }
+      th {
+        color: var(--mute);
+        font-weight: 600;
+        font-size: 11.5px;
+        text-transform: uppercase;
+        letter-spacing: 0.4px;
+      }
+      td.n {
+        font-variant-numeric: tabular-nums;
+        color: var(--mute);
+        white-space: nowrap;
+      }
+      .tag {
+        display: inline-block;
+        padding: 2px 8px;
+        border-radius: 999px;
+        font-size: 11.5px;
+        font-weight: 600;
+      }
+      .tag.raised {
+        background: #fff1e6;
+        color: #b35309;
+      }
+      .tag.confirmed {
+        background: #fdeaea;
+        color: #a11b1b;
+      }
+      .tag.dismissed {
+        background: #eaf2fb;
+        color: #1b4f84;
+      }
+      .tag.retrain {
+        background: #e9f7ee;
+        color: #18683a;
+      }
+      .tag.other {
+        background: #eceef2;
+        color: #4a4f57;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root:not([data-theme="light"]) .tag.raised {
+          background: #3a2a16;
+          color: #f0ad64;
+        }
+        :root:not([data-theme="light"]) .tag.confirmed {
+          background: #3a1f1f;
+          color: #ef8f8f;
+        }
+        :root:not([data-theme="light"]) .tag.dismissed {
+          background: #1b2c40;
+          color: #8ab7e8;
+        }
+        :root:not([data-theme="light"]) .tag.retrain {
+          background: #16321f;
+          color: #79d39b;
+        }
+        :root:not([data-theme="light"]) .tag.other {
+          background: #2a2d33;
+          color: #aab0b8;
+        }
+      }
+      .muted {
+        color: var(--mute);
+      }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <header>
+        <h1>Drift-aware retraining pipeline</h1>
+        <span class="sub"
+          ><span id="dot" class="dot off"></span
+          ><span id="conn">연결 중…</span></span
+        >
+      </header>
+
+      <div class="tiles" id="tiles"></div>
+
+      <div class="panel">
+        <h2>입력 분포 지표</h2>
+        <div class="cap">
+          PSI가 임계를 넘으면 재학습이 아니라 <b>확인 요청</b>이 발생합니다.
+        </div>
+        <svg
+          id="psiChart"
+          viewBox="0 0 900 220"
+          preserveAspectRatio="none"
+          height="220"
+        ></svg>
+        <div class="legend">
+          <span><i style="background: var(--red)"></i>PSI</span>
+          <span><i style="background: var(--orange)"></i>KS</span>
+          <span
+            ><i style="background: var(--mute); height: 2px"></i>임계값</span
+          >
+        </div>
+      </div>
+
+      <div class="panel">
+        <h2>실제 성능 (레이블 도착분)</h2>
+        <div class="cap">
+          재학습 결정은 언제나 이 선이 내립니다. 세로 막대는 재학습 시점입니다.
+        </div>
+        <svg
+          id="accChart"
+          viewBox="0 0 900 220"
+          preserveAspectRatio="none"
+          height="220"
+        ></svg>
+        <div class="legend">
+          <span><i style="background: var(--blue)"></i>정확도</span>
+          <span
+            ><i style="background: var(--mute); height: 2px"></i>기준 −
+            허용오차</span
+          >
+          <span><i style="background: var(--green)"></i>재학습</span>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h2>이벤트</h2>
+        <div class="cap">경보 접수 → 레이블 확인 → 확인 또는 기각</div>
+        <table>
+          <thead>
+            <tr>
+              <th style="width: 110px">종류</th>
+              <th style="width: 90px">본 샘플</th>
+              <th>상세</th>
+            </tr>
+          </thead>
+          <tbody id="events">
+            <tr>
+              <td colspan="3" class="muted">아직 없음</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <script>
+      const $ = (s) => document.querySelector(s);
+      const C = (n) =>
+        getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+
+      function tile(k, v) {
+        return `<div class="tile"><div class="k">${k}</div><div class="v">${v}</div></div>`;
+      }
+
+      function line(pts, color, width) {
+        if (!pts.length) return "";
+        const d = pts
+          .map(
+            (p, i) => (i ? "L" : "M") + p[0].toFixed(1) + " " + p[1].toFixed(1),
+          )
+          .join(" ");
+        return `<path d="${d}" fill="none" stroke="${color}" stroke-width="${width || 2}"
+    stroke-linejoin="round" stroke-linecap="round"/>`;
+      }
+
+      function chart(svgId, series, opts) {
+        const svg = $(svgId),
+          W = 900,
+          H = 220,
+          P = { l: 46, r: 12, t: 12, b: 26 };
+        const xs = series.flatMap((s) => s.pts.map((p) => p[0]));
+        if (!xs.length) {
+          svg.innerHTML = `<text x="18" y="110" fill="${C("--mute")}" font-size="13">데이터 수집 중…</text>`;
+          return;
+        }
+
+        const x0 = Math.min(...xs),
+          x1 = Math.max(...xs) || 1;
+        let ys = series
+          .flatMap((s) => s.pts.map((p) => p[1]))
+          .filter((v) => v != null);
+        if (opts.extraY) ys = ys.concat(opts.extraY.filter((v) => v != null));
+        let y0 = opts.y0 != null ? opts.y0 : Math.min(...ys);
+        let y1 = opts.y1 != null ? opts.y1 : Math.max(...ys);
+        if (y1 - y0 < 1e-9) y1 = y0 + 1;
+        const pad = (y1 - y0) * 0.12;
+        y0 -= pad;
+        y1 += pad;
+
+        const X = (v) => P.l + ((v - x0) / (x1 - x0 || 1)) * (W - P.l - P.r);
+        const Y = (v) => H - P.b - ((v - y0) / (y1 - y0)) * (H - P.t - P.b);
+
+        let g = "";
+        for (let i = 0; i <= 4; i++) {
+          const v = y0 + ((y1 - y0) * i) / 4,
+            y = Y(v);
+          g += `<line x1="${P.l}" y1="${y}" x2="${W - P.r}" y2="${y}" stroke="${C("--line")}" stroke-width="1"/>`;
+          g += `<text x="${P.l - 8}" y="${y + 4}" text-anchor="end" font-size="10.5" fill="${C("--mute")}">${(opts.fmt || ((v) => v.toFixed(2)))(v)}</text>`;
+        }
+        (opts.rules || []).forEach((r) => {
+          if (r.v == null) return;
+          g += `<line x1="${P.l}" y1="${Y(r.v)}" x2="${W - P.r}" y2="${Y(r.v)}"
+      stroke="${r.color || C("--mute")}" stroke-width="1.6" stroke-dasharray="4 4"/>`;
+        });
+        (opts.marks || []).forEach((m) => {
+          const x = X(m.x);
+          g += `<line x1="${x}" y1="${P.t}" x2="${x}" y2="${H - P.b}" stroke="${m.color}" stroke-width="2.5" opacity="0.35"/>`;
+        });
+        series.forEach((s) => {
+          g += line(
+            s.pts.filter((p) => p[1] != null).map((p) => [X(p[0]), Y(p[1])]),
+            s.color,
+            s.w,
+          );
+        });
+        g += `<text x="${P.l}" y="${H - 7}" font-size="10.5" fill="${C("--mute")}">${Math.round(x0)}</text>`;
+        g += `<text x="${W - P.r}" y="${H - 7}" text-anchor="end" font-size="10.5" fill="${C("--mute")}">${Math.round(x1)} samples</text>`;
+        svg.innerHTML = g;
+      }
+
+      const TAG = {
+        alarm_raised: ["raised", "경보 접수"],
+        alarm_confirmed: ["confirmed", "확인됨"],
+        alarm_dismissed: ["dismissed", "기각"],
+        retrain: ["retrain", "재학습"],
+        safety_net_triggered: ["confirmed", "안전망"],
+        deploy: ["other", "배포"],
+        baseline_set: ["other", "기준 설정"],
+        retrain_skipped: ["other", "재학습 보류"],
+        monitor_error: ["other", "오류"],
+      };
+
+      async function poll() {
+        try {
+          const [st, hi] = await Promise.all([
+            fetch("/status").then((r) => r.json()),
+            fetch("/history?limit=600").then((r) => r.json()),
+          ]);
+          $("#dot").className = "dot";
+          $("#conn").textContent = "실행 중";
+
+          const m = st.metrics || {},
+            c = st.event_counts || {};
+          $("#tiles").innerHTML = [
+            tile("모델 버전", "v" + (st.model.version ?? "—")),
+            tile("처리한 요청", (m.n_seen ?? 0).toLocaleString()),
+            tile("PSI", m.psi != null ? m.psi.toFixed(3) : "—"),
+            tile(
+              "정확도",
+              m.acc_lagged != null
+                ? (m.acc_lagged * 100).toFixed(1) + "%"
+                : "—",
+            ),
+            tile("경보 접수", c.alarm_raised ?? 0),
+            tile("확인됨", c.alarm_confirmed ?? 0),
+            tile("기각", c.alarm_dismissed ?? 0),
+            tile("재학습", c.retrain ?? 0),
+          ].join("");
+
+          const M = hi.metrics || [];
+          const marks = (hi.events || [])
+            .filter((e) => e.kind === "retrain")
+            .map((e) => ({ x: e.n_seen, color: C("--green") }));
+
+          chart(
+            "#psiChart",
+            [
+              {
+                pts: M.map((r) => [r.n_seen, r.psi]),
+                color: C("--red"),
+                w: 2.2,
+              },
+              {
+                pts: M.map((r) => [r.n_seen, r.ks]),
+                color: C("--orange"),
+                w: 2,
+              },
+            ],
+            {
+              y0: 0,
+              rules: [{ v: st.settings.psi_threshold }],
+              marks,
+              extraY: [st.settings.psi_threshold],
+              fmt: (v) => v.toFixed(2),
+            },
+          );
+
+          const thresh = m.drop_threshold,
+            base = m.base_acc;
+          chart(
+            "#accChart",
+            [
+              {
+                pts: M.map((r) => [r.n_seen, r.acc_lagged]),
+                color: C("--blue"),
+                w: 2.4,
+              },
+            ],
+            {
+              rules: thresh != null ? [{ v: thresh }] : [],
+              marks,
+              extraY: thresh != null ? [thresh, base] : [],
+              fmt: (v) => (v * 100).toFixed(0) + "%",
+            },
+          );
+
+          const ev = st.events || [];
+          $("#events").innerHTML = ev.length
+            ? ev
+                .map((e) => {
+                  const [cls, ko] = TAG[e.kind] || ["other", e.kind];
+                  let d = "";
+                  try {
+                    const o = JSON.parse(e.detail || "{}");
+                    d = Object.entries(o)
+                      .slice(0, 4)
+                      .map(
+                        ([k, v]) =>
+                          `${k}=${Array.isArray(v) ? v.join("–") : v}`,
+                      )
+                      .join("  ·  ");
+                  } catch (_) {}
+                  return `<tr><td><span class="tag ${cls}">${ko}</span></td>
+        <td class="n">${e.n_seen.toLocaleString()}</td>
+        <td class="muted">${d || "—"}</td></tr>`;
+                })
+                .join("")
+            : '<tr><td colspan="3" class="muted">아직 없음</td></tr>';
+        } catch (err) {
+          $("#dot").className = "dot off";
+          $("#conn").textContent = "연결 끊김";
+        }
+      }
+      poll();
+      setInterval(poll, 1500);
+    </script>
+  </body>
+</html>

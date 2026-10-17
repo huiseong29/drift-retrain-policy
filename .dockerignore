@@ -1,0 +1,29 @@
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+
+# 실험 산출물 · 런타임 데이터
+results/
+figures/
+service_data/
+*.db
+
+# 실험 스크립트 (이미지에 불필요)
+figures.py
+sweep.py
+detectors.py
+policy.py
+delay.py
+robustness.py
+hybrid.py
+
+.git/
+.gitignore
+.github/
+.vscode/
+.idea/
+notebooks/
+*.ipynb
+.DS_Store
+README.md
