@@ -24,9 +24,16 @@ degradation, and when to retrain.
 | 레이블 지연            | 지연 487에서 이점 **절반 소실**                             |
 | 제안 정책              | 혼합 드리프트에서 **93.6건 개선** (p=1.0e-04)               |
 
-![](figures/fig_robust_strength.png)
+![드리프트 강도별 성능 저하와 PSI 경보율](figures/fig_robust_strength.png)
 
 성능이 연속적으로 떨어지는 동안 PSI 경보율은 전 구간에서 0%에 머문다.
+
+## 파이프라인 동작
+
+![드리프트 모니터링 대시보드](figures/dashboard_v1.png)
+
+드리프트 발생 전에는 경보도 재학습도 없다. 발생 후 PSI가 급등하면
+재학습이 아니라 확인 요청이 걸리고, 레이블로 확인된 뒤에야 재학습이 실행된다.
 
 ---
 
