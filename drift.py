@@ -50,6 +50,8 @@ def make_stream(
                   → PSI/KS 같은 입력 기반 지표가 잡을 수 있음
       "concept" - X 분포는 그대로, X→y 관계(가중치)만 변화
                   → 입력 기반 지표는 구조적으로 못 잡음
+      "mixed"   - 위 둘이 동시에 발생. 현실에서 가장 흔한 경우이며,
+                  입력 지표가 "우연히 맞은 것처럼" 보이는 상황이다.
 
     strength (concept 전용):
       가중치 벡터를 각도 pi*strength 만큼 회전시킨다. 크기는 보존되므로
@@ -93,22 +95,23 @@ def make_stream(
         else:
             ramp[drift_start:] = 1.0
 
-    if drift_kind == "data":
+    shifts_input = drift_kind in ("data", "mixed")
+    shifts_concept = drift_kind in ("concept", "mixed")
+
+    if shifts_input:
         # 첫 두 피처의 평균을 이동
         shift = np.zeros((n_stream, n_features))
         shift[:, 0] = ramp * magnitude
         shift[:, 1] = ramp * magnitude * 0.8
         X_st = X_st + shift
-        y_st = label(X_st, w)
 
-    elif drift_kind == "concept":
-        # X는 건드리지 않고 관계만 바꿈
+    if shifts_concept:
+        # X 는 그대로 두고 X→y 관계만 바꿈
         for i in range(n_stream):
             w_i = (1 - ramp[i]) * w + ramp[i] * w_new
             logit = X_st[i] @ w_i
             p = 1 / (1 + np.exp(-logit))
             y_st[i] = int(rng.random() < p)
-
     else:
         y_st = label(X_st, w)
 

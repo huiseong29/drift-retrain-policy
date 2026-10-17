@@ -69,7 +69,8 @@ COLORS = {
 
 
 # ----------------------------------------------------------------------
-def simulate(policy, kind, gradual, seed, label_delay=LABEL_DELAY):
+def simulate(policy, kind, gradual, seed, label_delay=LABEL_DELAY,
+             expedite=4):
     """스트림을 따라가며 정책이 재학습 시점을 스스로 결정하게 한다."""
     X_ref, y_ref, X_st, y_st = make_stream(
         drift_kind=kind, gradual=gradual, seed=seed
@@ -83,6 +84,10 @@ def simulate(policy, kind, gradual, seed, label_delay=LABEL_DELAY):
     chunk_acc = []                # 청크별 정확도 (perf 정책이 지연 후 참조)
     last_periodic = 0
 
+    pending = None                # hybrid: 확인 대기 중인 트리거 청크
+    dismissed = 0                 # hybrid: 레이블 확인 결과 기각된 경보 수
+    confirmed = 0                 # hybrid: 확인되어 재학습으로 이어진 경보 수
+
     n_chunks = len(X_st) // CHUNK
 
     for i in range(n_chunks):
@@ -95,6 +100,7 @@ def simulate(policy, kind, gradual, seed, label_delay=LABEL_DELAY):
 
         # ---- 재학습 여부 결정 ----
         retrain = False
+        fast_labels = False        # hybrid: 우선 확보한 레이블을 쓸 수 있는가
 
         if policy == "never":
             pass
@@ -117,6 +123,48 @@ def simulate(policy, kind, gradual, seed, label_delay=LABEL_DELAY):
                 if chunk_acc[idx] < base - PERF_TOL:
                     retrain = True
 
+        elif policy == "hybrid":
+            # 제안 정책: 입력 지표를 "재학습 트리거"가 아니라 "확인 요청"으로 쓴다.
+            #
+            #  1) PSI 가 울리면 즉시 재학습하지 않고 그 청크를 확인 대기에 올린다.
+            #  2) 그 청크에 한해 레이블을 우선 확보한다. 전수 레이블링을
+            #     앞당기는 것이 아니라 지목된 구간만 빨리 받는 것이므로,
+            #     지연이 1/expedite 로 줄어든다. 이것이 비용이다.
+            #  3) 확보된 레이블로 실제 정확도를 확인한다.
+            #       - 떨어졌으면 재학습     (확인된 경보)
+            #       - 멀쩡하면 기각하고 기준 구간만 갱신 (기각된 경보)
+            #  4) PSI 가 끝내 울리지 않는 컨셉 드리프트를 위해, 통상 지연의
+            #     성능 감시를 안전망으로 함께 돌린다.
+            #
+            # 입력 지표는 "어디에 레이블을 먼저 쓸지"를 정하는 신호로만 쓰이며,
+            # 재학습 결정은 항상 레이블이 내린다.
+            lag_chunks = label_delay // CHUNK
+            lag_fast = max(1, int(round(label_delay / expedite / CHUNK)))
+            base = float(np.mean(chunk_acc[:5])) if i >= 5 else None
+
+            # (1)(2) 경보 접수 — 해당 구간 레이블을 우선 확보
+            if pending is None and psi_multi(ref_X, Xw) >= PSI_TH:
+                pending = i
+
+            # (3) 우선 확보된 레이블로 확인
+            if pending is not None and base is not None \
+                    and i - pending >= lag_fast:
+                if chunk_acc[pending] < base - PERF_TOL:
+                    retrain = True
+                    confirmed += 1
+                    # 우선 확보한 레이블은 재학습에도 쓸 수 있다
+                    fast_labels = True
+                else:
+                    dismissed += 1
+                    ref_X = Xw          # 같은 변화로 계속 울리지 않게 기준 갱신
+                pending = None
+
+            # (4) 안전망: 입력 지표가 침묵하는 경우를 위한 통상 지연 감시
+            if not retrain and base is not None:
+                idx = i - lag_chunks
+                if idx >= 5 and chunk_acc[idx] < base - PERF_TOL:
+                    retrain = True
+
         elif policy == "onset":
             # 드리프트 이후 구간만으로 학습할 수 있게 되는 가장 이른 시점.
             # 레이블 지연 때문에 드리프트 발생 즉시 재학습해도 손에 들어온
@@ -126,7 +174,10 @@ def simulate(policy, kind, gradual, seed, label_delay=LABEL_DELAY):
 
         # ---- 재학습 실행 ----
         if retrain:
-            avail_end = e - label_delay        # 정답이 도착한 지점까지만 사용
+            # 정답이 도착한 지점까지만 사용.
+            # 확인된 경보로 재학습하는 경우에는 우선 확보한 구간까지 쓸 수 있다.
+            eff_delay = (label_delay / expedite) if fast_labels else label_delay
+            avail_end = int(e - eff_delay)
             if avail_end >= TRAIN_WINDOW:
                 lo = avail_end - TRAIN_WINDOW
                 Xt, yt = X_st[lo:avail_end], y_st[lo:avail_end]
@@ -148,6 +199,8 @@ def simulate(policy, kind, gradual, seed, label_delay=LABEL_DELAY):
         "retrains": retrains,
         "error_rate": errors / total,
         "mean_acc": float(np.mean(chunk_acc)),
+        "confirmed": confirmed,      # hybrid 전용
+        "dismissed": dismissed,      # hybrid 전용
     }
 
 
