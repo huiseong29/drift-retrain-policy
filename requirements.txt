@@ -7,3 +7,4 @@ river
 fastapi
 uvicorn[standard]
 httpx
+pytest

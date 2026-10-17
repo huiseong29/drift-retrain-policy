@@ -28,9 +28,10 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
+          pip install pytest          # requirements 에 없어도 확실히 설치
 
       - name: Run tests
-        run: pytest
+        run: python -m pytest
 
   # 파이프라인이 실제로 기동되고 예측·레이블·재학습까지 도는지 확인한다.
   # 단위 테스트가 잡지 못하는 결선 오류를 여기서 걸러낸다.
