@@ -42,3 +42,7 @@ desktop.ini
 *.log
 .cache/
 .pytest_cache/
+
+# ---- 파이프라인 런타임 ----
+service_data/
+*.db
