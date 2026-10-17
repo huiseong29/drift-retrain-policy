@@ -69,7 +69,7 @@ COLORS = {
 
 
 # ----------------------------------------------------------------------
-def simulate(policy, kind, gradual, seed):
+def simulate(policy, kind, gradual, seed, label_delay=LABEL_DELAY):
     """스트림을 따라가며 정책이 재학습 시점을 스스로 결정하게 한다."""
     X_ref, y_ref, X_st, y_st = make_stream(
         drift_kind=kind, gradual=gradual, seed=seed
@@ -110,7 +110,7 @@ def simulate(policy, kind, gradual, seed):
 
         elif policy == "perf":
             # 레이블 지연 때문에 지금 청크의 정확도는 아직 볼 수 없다.
-            lag_chunks = LABEL_DELAY // CHUNK
+            lag_chunks = label_delay // CHUNK
             idx = i - lag_chunks
             if idx >= 5:                                  # 기준선 확보 후
                 base = float(np.mean(chunk_acc[:5]))
@@ -121,12 +121,12 @@ def simulate(policy, kind, gradual, seed):
             # 드리프트 이후 구간만으로 학습할 수 있게 되는 가장 이른 시점.
             # 레이블 지연 때문에 드리프트 발생 즉시 재학습해도 손에 들어온
             # 데이터는 아직 드리프트 이전 것이라 효과가 없다.
-            if retrains == 0 and (e - LABEL_DELAY - TRAIN_WINDOW) >= DRIFT_START:
+            if retrains == 0 and (e - label_delay - TRAIN_WINDOW) >= DRIFT_START:
                 retrain = True
 
         # ---- 재학습 실행 ----
         if retrain:
-            avail_end = e - LABEL_DELAY        # 정답이 도착한 지점까지만 사용
+            avail_end = e - label_delay        # 정답이 도착한 지점까지만 사용
             if avail_end >= TRAIN_WINDOW:
                 lo = avail_end - TRAIN_WINDOW
                 Xt, yt = X_st[lo:avail_end], y_st[lo:avail_end]
