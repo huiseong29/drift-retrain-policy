@@ -41,6 +41,7 @@ def make_stream(
     drift_kind="data",   # "data" | "concept" | "none"
     magnitude=1.5,       # 변화 강도
     gradual=False,       # True면 서서히 변화
+    strength=1.0,        # 컨셉 드리프트 강도 (0=변화 없음, 1=완전 반전)
     seed=SEED,
 ):
     """
@@ -49,11 +50,26 @@ def make_stream(
                   → PSI/KS 같은 입력 기반 지표가 잡을 수 있음
       "concept" - X 분포는 그대로, X→y 관계(가중치)만 변화
                   → 입력 기반 지표는 구조적으로 못 잡음
+
+    strength (concept 전용):
+      가중치 벡터를 각도 pi*strength 만큼 회전시킨다. 크기는 보존되므로
+      "신호가 약해져서" 성능이 떨어지는 것이 아니라 순수하게 관계의 방향만
+      바뀐다. strength=1.0 이면 w_new = -w (완전 반전).
     """
     rng = np.random.default_rng(seed)
 
     w = rng.normal(0, 1, n_features)          # 원래 관계
-    w_new = -w                                 # 뒤집힌 관계 (concept drift용)
+
+    # w 와 직교하면서 크기가 같은 벡터를 만들어 회전축으로 쓴다.
+    # 별도 난수원을 쓰는 이유: 이 벡터를 뽑느라 주 난수열이 밀리면
+    # strength 를 추가하기 전에 얻은 결과가 재현되지 않는다.
+    rng_rot = np.random.default_rng(seed + 10_000)
+    r = rng_rot.normal(0, 1, n_features)
+    r -= (r @ w) / (w @ w) * w
+    w_perp = r / np.linalg.norm(r) * np.linalg.norm(w)
+
+    theta = np.pi * strength
+    w_new = np.cos(theta) * w + np.sin(theta) * w_perp
 
     def label(X, weights):
         logit = X @ weights
@@ -132,9 +148,10 @@ def ks_multi(X_ref, X_cur):
 # 3. 실험: 윈도우를 밀면서 지표와 성능을 동시에 측정
 # ----------------------------------------------------------------------
 def run(drift_kind, gradual=False, window=500, step=100, magnitude=1.5,
-        seed=SEED):
+        strength=1.0, seed=SEED):
     X_ref, y_ref, X_st, y_st = make_stream(
-        drift_kind=drift_kind, gradual=gradual, magnitude=magnitude, seed=seed
+        drift_kind=drift_kind, gradual=gradual, magnitude=magnitude,
+        strength=strength, seed=seed
     )
 
     model = LogisticRegression(max_iter=1000).fit(X_ref, y_ref)
