@@ -1,0 +1,82 @@
+name: tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.10", "3.11", "3.12"]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run tests
+        run: pytest
+
+  # 파이프라인이 실제로 기동되고 예측·레이블·재학습까지 도는지 확인한다.
+  # 단위 테스트가 잡지 못하는 결선 오류를 여기서 걸러낸다.
+  smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      # 감시 주기를 줄여 CI 안에서 워밍업·경보·재학습이 모두 일어나게 한다.
+      # 기본값(1.0s)에 빠른 트래픽을 흘리면 기준선을 잡기 전에 끝나버린다.
+      - name: Start service
+        env:
+          MONITOR_INTERVAL: "0.3"
+        run: |
+          uvicorn service.api:app --host 127.0.0.1 --port 8000 \
+            --log-level warning &
+          for i in $(seq 1 30); do
+            curl -sf http://127.0.0.1:8000/health && break
+            sleep 1
+          done
+
+      - name: Drive traffic through the pipeline
+        run: |
+          python -m service.simulator --drift mixed --rate 400 --n 6000
+
+      - name: Assert the pipeline actually retrained
+        run: |
+          python - <<'PY'
+          import json, sys, httpx
+          st = httpx.get("http://127.0.0.1:8000/status", timeout=10).json()
+          counts = st.get("event_counts", {})
+          version = st["model"].get("version", 0)
+          print(json.dumps(counts, indent=2))
+          print("model version:", version)
+
+          assert st["metrics"]["n_seen"] >= 6000, "트래픽이 들어오지 않았다"
+          assert version > 1, "드리프트가 있었는데 재학습이 없었다"
+          assert counts.get("retrain", 0) >= 1
+          PY

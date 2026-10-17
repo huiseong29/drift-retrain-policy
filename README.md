@@ -1,5 +1,9 @@
 # drift-retrain-policy
 
+[![tests](https://github.com/huiseong29/drift-retrain-policy/actions/workflows/tests.yml/badge.svg)](https://github.com/<USER>/drift-retrain-policy/actions/workflows/tests.yml)
+![python](https://img.shields.io/badge/python-3.10--3.12-blue)
+![license](https://img.shields.io/badge/license-MIT-lightgrey)
+
 Measuring how well drift detection metrics predict actual model performance
 degradation, and when to retrain.
 
@@ -52,7 +56,7 @@ degradation, and when to retrain.
 
 ## 설치
 
-Python 3.10 이상.
+Python 3.10–3.12 (3.13 이상은 일부 패키지 휠이 아직 없을 수 있다).
 
 ```bash
 python -m venv .venv
@@ -91,6 +95,34 @@ python robustness.py && python hybrid.py
 되돌릴 수 없는 노이즈가 존재한다. 시드별 베이즈 최적 정확도는 0.655–0.851이고,
 학습된 모델의 정확도는 이와 ±0.01 이내로 일치한다. 따라서 관측되는 성능
 저하는 모델의 학습 부족이 아니라 드리프트에 의한 것이다.
+
+성능 저하 '정답' 판정(`perf_drop_point`)은 고정 허용오차 0.05를 쓰므로 그
+자체에 노이즈 바닥이 있다. 드리프트가 전혀 없는 스트림 30개에서 3개(10%)가
+저하로 판정된다. 데이터 드리프트 시나리오에서 관측되는 5–10% 의 저하율은
+드리프트 효과가 아니라 대부분 이 바닥값이며, 따라서 **데이터 드리프트는
+성능을 사실상 전혀 떨어뜨리지 않는다**고 읽어야 한다.
+
+## 테스트
+
+```bash
+pytest
+```
+
+40개. 구현 세부가 아니라 논문의 전제를 검사한다.
+
+- 컨셉 드리프트가 입력 분포를 바꾸지 않는지 (피처별 KS 검정)
+- 그러면서 성능은 실제로 떨어지는지
+- 드리프트 강도에 따라 저하가 단조 증가하는지, 가중치 크기가 보존되는지
+- PSI 정책이 레이블 지연과 무관한지 / perf 정책이 지연에 반응하는지
+- 제안 정책이 헛경보를 기각하면서 안전망은 유지하는지
+- 정답 판정의 노이즈 바닥 특성화
+
+`test_concept_drift_leaves_input_distribution_intact` 가 깨지면 논문 전체의
+결론이 성립하지 않는다.
+
+GitHub Actions 가 push 마다 Python 3.10–3.12 에서 테스트를 돌리고,
+별도 job 에서 파이프라인을 실제로 기동해 트래픽을 흘린 뒤 재학습이
+일어났는지까지 확인한다 (`.github/workflows/tests.yml`).
 
 ## 파이프라인 실행
 
@@ -170,6 +202,7 @@ drift.py           합성 데이터 생성기 (data / concept / mixed), PSI·KS
     ├─ simulator.py    트래픽 생성기 (지연 레이블, 우선 확보 수행)
     └─ dashboard.html  실시간 대시보드 (외부 의존성 없음)
 
+tests/             논문의 전제를 검사하는 테스트 (pytest)
 figures/           논문·포스터용 그림 (커밋)
 results/           실행 산출물 (gitignored)
 ```
@@ -192,3 +225,10 @@ results/           실행 산출물 (gitignored)
 - 레이블 가속 배수(`expedite=4`)는 가정이며, 실제 비용 모델이 필요하다
 - 오차 기반 탐지기도 완전하지 않다. DDM은 드리프트 없는 스트림에서
   20% 오탐을 냈다 (ADWIN·Page-Hinkley는 0%)
+- 성능 저하 판정 자체에 10% 의 노이즈 바닥이 있다 (위 실험 설계 메모 참고)
+
+---
+
+## 라이선스
+
+MIT
