@@ -36,6 +36,9 @@ import itertools
 
 import numpy as np
 import pandas as pd
+import matplotlib
+matplotlib.use("Agg")
+import matplotlib.pyplot as plt
 from scipy import stats as sps
 
 from policy import simulate
@@ -292,6 +295,79 @@ def fire_rate_tests():
 
 
 # ----------------------------------------------------------------------
+# 5. 동등성 검정 그림 (forest plot)
+# ----------------------------------------------------------------------
+def fig_equivalence(data, fname="fig_equivalence.png"):
+    """
+    평균 차이와 95% 신뢰구간을 동등범위와 함께 그린다.
+
+    신뢰구간이 회색 띠(동등범위) 안에 완전히 들어가면 '실질적으로 동등'이고,
+    띠 밖으로 벗어나면 실제 차이가 있다는 뜻이다. p 값 하나보다 이 그림이
+    "차이가 없음"을 훨씬 분명하게 보여준다.
+    """
+    rng = np.random.default_rng(0)
+    rows = []
+    for _, _, label in SCENARIOS:
+        never = data[(label, "never")]
+        margin = EQUIV_MARGIN_RATIO * never.mean()
+        for policy in ["psi", "perf", "hybrid"]:
+            d = never - data[(label, policy)]
+            boot = rng.choice(d, (5000, len(d)), replace=True).mean(axis=1)
+            lo, hi = np.percentile(boot, [2.5, 97.5])
+            rows.append({
+                "scenario": label, "policy": policy,
+                "mean": d.mean(), "lo": lo, "hi": hi,
+                "margin": margin,
+                # 신뢰구간이 동등범위 안에 완전히 들어가는가
+                "equivalent": (lo > -margin) and (hi < margin),
+            })
+    df = pd.DataFrame(rows)
+
+    POL_COLOR = {"psi": "#d62728", "perf": "#1f77b4", "hybrid": "#17becf"}
+    fig, axes = plt.subplots(1, len(SCENARIOS), figsize=(16, 4.4))
+
+    for ax, (_, _, label) in zip(axes, SCENARIOS):
+        g = df[df.scenario == label].reset_index(drop=True)
+        margin = g["margin"].iloc[0]
+
+        # 동등범위 띠
+        ax.axvspan(-margin, margin, color="#999", alpha=0.16, lw=0)
+        ax.axvline(0, color="#333", lw=1.2)
+
+        for i, r in g.iterrows():
+            y = len(g) - 1 - i
+            ax.plot([r.lo, r.hi], [y, y], lw=3,
+                    color=POL_COLOR[r.policy], solid_capstyle="round")
+            ax.plot([r["mean"]], [y], marker="D", ms=9,
+                    color=POL_COLOR[r.policy], markeredgecolor="white",
+                    markeredgewidth=1.4, zorder=3)
+            ax.text(r.hi, y + 0.22,
+                    "equivalent" if r.equivalent else "different",
+                    fontsize=8.5, ha="left" if r.hi >= 0 else "right",
+                    color="#555")
+
+        ax.set_yticks(range(len(g)))
+        ax.set_yticklabels([r.policy for r in g.itertuples()][::-1],
+                           fontsize=10)
+        ax.set_ylim(-0.6, len(g) - 0.3)
+        ax.set_title(f"{label}\nequivalence margin  ±{margin:.0f}", fontsize=10.5)
+        ax.set_xlabel("errors avoided  (never − policy)", fontsize=9.5)
+        ax.grid(axis="x", alpha=0.25)
+        ax.set_axisbelow(True)
+
+        span = max(abs(g.lo.min()), abs(g.hi.max()), margin) * 1.45
+        ax.set_xlim(-span * 0.35, span)
+
+    fig.suptitle("A confidence interval inside the grey band means the policy "
+                 "is practically equivalent to doing nothing",
+                 fontsize=13, fontweight="bold", y=1.0)
+    plt.tight_layout(rect=[0, 0, 1, 0.9])
+    plt.savefig(f"{OUT}/{fname}", dpi=200)
+    plt.close()
+    return df
+
+
+# ----------------------------------------------------------------------
 if __name__ == "__main__":
     print(f"[1/4] simulating ({N_SEEDS} seeds) ...")
     data = collect()
@@ -303,6 +379,7 @@ if __name__ == "__main__":
     print("[3/4] equivalence (TOST) and power analysis ...")
     eq = equivalence(data)
     eq.to_csv(f"{OUT}/stats_tost.csv", index=False)
+    fig_equivalence(data)
     pw2 = power_analysis(data)
     pw2.to_csv(f"{OUT}/stats_power.csv", index=False)
 
