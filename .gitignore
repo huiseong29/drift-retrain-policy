@@ -1,0 +1,44 @@
+# ---- Python ----
+__pycache__/
+*.py[cod]
+*.so
+.Python
+build/
+dist/
+*.egg-info/
+
+# ---- 가상환경 ----
+.venv/
+venv/
+env/
+ENV/
+
+# ---- 실험 산출물 ----
+# 코드를 돌리면 재생성되므로 추적하지 않는다.
+# 논문/포스터에 실제로 쓴 그림만 figures/ 에 따로 복사해 커밋한다.
+results/
+
+# ---- 노트북 ----
+.ipynb_checkpoints/
+*.nbconvert.ipynb
+
+# ---- 자격증명 (실수 방지) ----
+.env
+.env.*
+*.pem
+*.key
+secrets.*
+config.local.*
+
+# ---- 에디터 / OS ----
+.vscode/
+.idea/
+*.swp
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ---- 기타 ----
+*.log
+.cache/
+.pytest_cache/
