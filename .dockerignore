@@ -1,15 +1,17 @@
 .venv/
 venv/
-__pycache__/
-*.py[cod]
+**pycache**/
+\*.py[cod]
 
 # 실험 산출물 · 런타임 데이터
+
 results/
 figures/
 service_data/
-*.db
+\*.db
 
 # 실험 스크립트 (이미지에 불필요)
+
 figures.py
 sweep.py
 detectors.py
@@ -24,6 +26,12 @@ hybrid.py
 .vscode/
 .idea/
 notebooks/
-*.ipynb
+\*.ipynb
 .DS_Store
 README.md
+
+# ---- 테스트 ----
+
+.pytest_cache/
+tests/
+pytest.ini
