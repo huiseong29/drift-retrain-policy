@@ -70,7 +70,7 @@ COLORS = {
 
 # ----------------------------------------------------------------------
 def simulate(policy, kind, gradual, seed, label_delay=LABEL_DELAY,
-             expedite=4):
+             expedite=4, period=PERIOD):
     """스트림을 따라가며 정책이 재학습 시점을 스스로 결정하게 한다."""
     X_ref, y_ref, X_st, y_st = make_stream(
         drift_kind=kind, gradual=gradual, seed=seed
@@ -106,7 +106,7 @@ def simulate(policy, kind, gradual, seed, label_delay=LABEL_DELAY,
             pass
 
         elif policy == "periodic":
-            if e - last_periodic >= PERIOD:
+            if e - last_periodic >= period:
                 retrain = True
                 last_periodic = e
 
